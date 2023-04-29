@@ -21,7 +21,7 @@ func main() {
 
 	router := httprouter.New()
 
-	handler := user.NewHandler(db)
+	handler := user.NewHandler(db, cfg)
 	handler.Register(router)
 
 	defer func(db *sql.DB) {

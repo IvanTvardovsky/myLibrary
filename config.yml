@@ -11,3 +11,5 @@ storage:
   database: mylibrarydb
   username: postgres
   password: bebra123
+authorization:
+  key: a-big-secret

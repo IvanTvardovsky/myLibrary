@@ -10,6 +10,7 @@ type Config struct {
 	IsDebug *bool         `yaml:"is_debug" env-required:"true"`
 	Listen  Listener      `yaml:"listen"`
 	Storage StorageConfig `yaml:"storage"`
+	Key     JWTSecretKey  `yaml:"authorization"`
 }
 
 type Listener struct {
@@ -19,11 +20,15 @@ type Listener struct {
 }
 
 type StorageConfig struct {
-	Host     string `json:"host"`
-	Port     rune   `json:"port"`
-	Database string `json:"database"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Host     string `yaml:"host"`
+	Port     rune   `yaml:"port"`
+	Database string `yaml:"database"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+}
+
+type JWTSecretKey struct {
+	SecretKey string `yaml:"key"`
 }
 
 var instance *Config
