@@ -15,9 +15,12 @@ import (
 )
 
 const (
-	RegisterUrl = "/register"
-	LoginUrl    = "/login"
-	userUuidUrl = "/user/:uuid"
+	RegisterUrl      = "/register"
+	LoginUrl         = "/login"
+	UserUuidUrl      = "/user/:uuid"
+	BooksUrl         = "/books"
+	FinishedBooksUrl = "/finished"
+	WishlistBooksUrl = "/wishlist"
 )
 
 type handler struct {
@@ -32,14 +35,35 @@ func NewHandler(db *sql.DB, cfg *config.Config) handlers.Handler {
 func (h *handler) Register(router *httprouter.Router) {
 	router.POST(RegisterUrl, h.RegisterUser)
 	router.POST(LoginUrl, h.LoginUser)
-	router.GET(userUuidUrl, h.GetUserByUUID)
-	router.PUT(userUuidUrl, h.FullyUpdateUser)
-	router.PATCH(userUuidUrl, h.UpdateUser)
-	router.DELETE(userUuidUrl, h.DeleteUser)
-	// функция получения всех прочитанных книг пользователя
-	// функция получения всех книг из вишлиста пользователя
-	// функция добавления книги
-	// функция перемещения книги из вишлиста в прочитанные
+	router.GET(UserUuidUrl, h.GetUserByUUID)
+	router.PUT(UserUuidUrl, h.FullyUpdateUser)
+	router.PATCH(UserUuidUrl, h.UpdateUser)
+	router.DELETE(UserUuidUrl, h.DeleteUser)
+	router.POST(UserUuidUrl+BooksUrl+FinishedBooksUrl, h.AddFinishedBook)
+	router.POST(UserUuidUrl+BooksUrl+WishlistBooksUrl, h.AddWishlistBook)
+	router.GET(UserUuidUrl+BooksUrl+FinishedBooksUrl, h.GetFinishedBooks)
+	router.GET(UserUuidUrl+BooksUrl+WishlistBooksUrl, h.GetWishlistBooks)
+	router.PUT(UserUuidUrl+BooksUrl+FinishedBooksUrl, h.FromWishlistToFinished)
+}
+
+func (h *handler) AddFinishedBook(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+
+}
+
+func (h *handler) AddWishlistBook(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+
+}
+
+func (h *handler) GetFinishedBooks(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	w.Write([]byte("this is list of Finished books"))
+}
+
+func (h *handler) GetWishlistBooks(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	w.Write([]byte("this is list of wishlist books"))
+}
+
+func (h *handler) FromWishlistToFinished(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	w.Write([]byte("this is moving from wishlist to Finished"))
 }
 
 func (h *handler) LoginUser(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
