@@ -46,14 +46,6 @@ func (h *handler) Register(router *httprouter.Router) {
 	router.PUT(UserUuidUrl+BooksUrl+FinishedBooksUrl, h.FromWishlistToFinished)
 }
 
-func (h *handler) AddFinishedBook(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-
-}
-
-func (h *handler) AddWishlistBook(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-
-}
-
 func (h *handler) GetFinishedBooks(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	w.Write([]byte("this is list of Finished books"))
 }
@@ -144,7 +136,7 @@ func (h *handler) RegisterUser(w http.ResponseWriter, r *http.Request, params ht
 		return
 	}
 
-	if !SuitableForRestrictions(len(requestUser.Username), len(requestUser.Password), len(requestUser.Email)) {
+	if !UserSuitableForRestrictions(len(requestUser.Username), len(requestUser.Password), len(requestUser.Email)) {
 		http.Error(w, "Too big length of username/password/email", http.StatusBadRequest)
 		logger.Log.Info(fmt.Sprintf("Bad request: Too big length of username/password/email"))
 		return
@@ -276,7 +268,7 @@ func (h *handler) FullyUpdateUser(w http.ResponseWriter, r *http.Request, params
 		return
 	}
 
-	if !SuitableForRestrictions(len(requestUser.Username), len(requestUser.Password), len(requestUser.Email)) {
+	if !UserSuitableForRestrictions(len(requestUser.Username), len(requestUser.Password), len(requestUser.Email)) {
 		http.Error(w, "Too big length of username/password/email", http.StatusBadRequest)
 		logger.Log.Info(fmt.Sprintf("Bad request: Too big length of username/password/email"))
 		return
@@ -340,7 +332,7 @@ func (h *handler) UpdateUser(w http.ResponseWriter, r *http.Request, params http
 		return
 	}
 
-	if !SuitableForRestrictions(len(requestUser.Username), len(requestUser.Password), len(requestUser.Email)) {
+	if !UserSuitableForRestrictions(len(requestUser.Username), len(requestUser.Password), len(requestUser.Email)) {
 		http.Error(w, "Too big length of username/password/email", http.StatusBadRequest)
 		logger.Log.Info(fmt.Sprintf("Bad request: Too big length of username/password/email"))
 		return
@@ -421,6 +413,60 @@ func (h *handler) DeleteUser(w http.ResponseWriter, r *http.Request, params http
 	w.WriteHeader(http.StatusOK)
 }
 
-/*func (h *handler) GetList(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	w.Write([]byte("this is list of users"))
-}*/
+func (h *handler) AddFinishedBook(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	AddBook(w, r, params, true, h.db)
+}
+
+func (h *handler) AddWishlistBook(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	AddBook(w, r, params, false, h.db)
+}
+
+func AddBook(w http.ResponseWriter, r *http.Request, params httprouter.Params, isFinished bool, db *sql.DB) {
+
+	var book interface{}
+	var err error
+
+	if isFinished {
+		finishedBook := FinishedBook{}
+		err = json.NewDecoder(r.Body).Decode(&finishedBook)
+		book = finishedBook
+	} else {
+		wishlistBook := WishlistBook{}
+		err = json.NewDecoder(r.Body).Decode(&wishlistBook)
+		book = wishlistBook
+	}
+
+	if err != nil {
+		http.Error(w, "Bad request body: "+err.Error(), http.StatusBadRequest)
+		logger.Log.Info(fmt.Sprintf("Bad request body: ") + err.Error())
+		return
+	}
+
+	userID := params.ByName("uuid")
+
+	now := time.Now()
+	year, month, day := now.Date()
+	date := fmt.Sprintf("%d-%d-%d", year, month, day)
+
+	switch s := book.(type) {
+	case WishlistBook:
+		_, err = db.Exec(`
+		INSERT INTO books (title, author, date_added, user_id, is_read, cover_image_url)
+		VALUES ($1, $2, $3, $4, $5, COALESCE($6, ''))
+		`, s.Title, s.Author, date, userID, 0, s.CoverImage)
+	case FinishedBook:
+		_, err = db.Exec(`
+		INSERT INTO books (title, author, date_added, user_id, is_read, rating, comment, cover_image_url)
+		VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, ''), COALESCE($8, ''))
+		`, s.Title, s.Author, date, userID, 1, s.Rating, s.Comment, s.CoverImage)
+	}
+
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Database unavailable: ")+err.Error(), http.StatusServiceUnavailable)
+		logger.Log.Info(fmt.Sprintf("Database unavailable: ") + err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	return
+}

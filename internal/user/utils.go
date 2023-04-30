@@ -25,7 +25,7 @@ func IdExists(ID int, db *sql.DB) (int, error) {
 	return 1, nil
 }
 
-func SuitableForRestrictions(lenUsername, lenPassword, lenEmail int) bool {
+func UserSuitableForRestrictions(lenUsername, lenPassword, lenEmail int) bool {
 	if lenUsername > 32 || lenPassword > 128 || lenEmail > 64 {
 		return false
 	}
