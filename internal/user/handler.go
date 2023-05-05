@@ -47,15 +47,128 @@ func (h *handler) Register(router *httprouter.Router) {
 }
 
 func (h *handler) GetFinishedBooks(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	w.Write([]byte("this is list of Finished books"))
+	userID := params.ByName("uuid")
+	rows, err := h.db.Query("SELECT id, title, author, cover_image_url, date_added, rating, comment FROM books WHERE user_id = $1 AND is_read = $2", userID, true)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Database unavailable: ")+err.Error(), http.StatusServiceUnavailable)
+		logger.Log.Info(fmt.Sprintf("Database unavailable: ") + err.Error())
+		return
+	}
+
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Database unavailable: ")+err.Error(), http.StatusServiceUnavailable)
+			logger.Log.Info(fmt.Sprintf("Database unavailable: ") + err.Error())
+			return
+		}
+	}(rows)
+
+	var finishedBooks []FinishedBook
+	for rows.Next() {
+		var book FinishedBook
+		err := rows.Scan(&book.ID, &book.Title, &book.Author, &book.CoverImage, &book.DateWhenAdded, &book.Rating, &book.Comment)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Database unavailable: ")+err.Error(), http.StatusServiceUnavailable)
+			logger.Log.Info(fmt.Sprintf("Database unavailable: ") + err.Error())
+			return
+		}
+		finishedBooks = append(finishedBooks, book)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if len(finishedBooks) == 0 {
+		w.Write([]byte("[]"))
+		return
+	}
+	err = json.NewEncoder(w).Encode(finishedBooks)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error while sending JSON: ")+err.Error(), http.StatusServiceUnavailable)
+		logger.Log.Info(fmt.Sprintf("Error while sending JSON: ") + err.Error())
+		return
+	}
 }
 
 func (h *handler) GetWishlistBooks(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	w.Write([]byte("this is list of wishlist books"))
+	userID := params.ByName("uuid")
+	rows, err := h.db.Query("SELECT id, title, author, cover_image_url, date_added FROM books WHERE user_id = $1 AND is_read = $2", userID, false)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Database unavailable: ")+err.Error(), http.StatusServiceUnavailable)
+		logger.Log.Info(fmt.Sprintf("Database unavailable: ") + err.Error())
+		return
+	}
+
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Database unavailable: ")+err.Error(), http.StatusServiceUnavailable)
+			logger.Log.Info(fmt.Sprintf("Database unavailable: ") + err.Error())
+			return
+		}
+	}(rows)
+
+	var wishlistBooks []WishlistBook
+	for rows.Next() {
+		var book WishlistBook
+		err := rows.Scan(&book.ID, &book.Title, &book.Author, &book.CoverImage, &book.DateWhenAdded)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Database unavailable: ")+err.Error(), http.StatusServiceUnavailable)
+			logger.Log.Info(fmt.Sprintf("Database unavailable: ") + err.Error())
+			return
+		}
+		wishlistBooks = append(wishlistBooks, book)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if len(wishlistBooks) == 0 {
+		w.Write([]byte("[]"))
+		return
+	}
+	err = json.NewEncoder(w).Encode(wishlistBooks)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error while sending JSON: ")+err.Error(), http.StatusServiceUnavailable)
+		logger.Log.Info(fmt.Sprintf("Error while sending JSON: ") + err.Error())
+		return
+	}
 }
 
 func (h *handler) FromWishlistToFinished(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	w.Write([]byte("this is moving from wishlist to Finished"))
+	var additionalInfo FinishedBook // we can add comment + rating here
+	err := json.NewDecoder(r.Body).Decode(&additionalInfo)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		logger.Log.Info(fmt.Sprintf("Bad request: ") + err.Error())
+		return
+	}
+
+	bookID, err := strconv.Atoi(additionalInfo.ID)
+
+	if err != nil {
+		http.Error(w, "Bad request: Invalid book ID", http.StatusBadRequest)
+		logger.Log.Info("Bad request: Invalid book ID")
+		return
+	}
+
+	counter, err := BookExists(bookID, h.db)
+
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Database unavailable: ")+err.Error(), http.StatusServiceUnavailable)
+		logger.Log.Info(fmt.Sprintf("Database unavailable: ") + err.Error())
+		return
+	}
+	if counter == 0 {
+		http.Error(w, "Bad request: Book not found", http.StatusNotFound)
+		logger.Log.Info("Bad request: Book not found")
+		return
+	}
+
+	_, err = h.db.Exec("UPDATE books SET is_read = $1, comment = $2, rating = $3 WHERE id = $4", true, additionalInfo.Comment, additionalInfo.Rating, additionalInfo.ID)
+	if err != nil {
+		http.Error(w, "Error updating book: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *handler) LoginUser(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -89,7 +202,7 @@ func (h *handler) LoginUser(w http.ResponseWriter, r *http.Request, params httpr
 
 	payload := jwt.MapClaims{
 		"sub": loginRequest.Email,
-		"exp": time.Now().Add(time.Hour * 7 * 24).Unix(),
+		"exp": time.Now().Add(time.Hour * 14 * 24).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, payload)

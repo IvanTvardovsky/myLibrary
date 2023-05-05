@@ -25,6 +25,18 @@ func IdExists(ID int, db *sql.DB) (int, error) {
 	return 1, nil
 }
 
+func BookExists(ID int, db *sql.DB) (int, error) {
+	var BookExists int
+	err := db.QueryRow("SELECT COUNT(*) FROM books WHERE id = $1", ID).Scan(&BookExists)
+	if err != nil {
+		return 0, err
+	}
+	if BookExists == 0 {
+		return 0, nil
+	}
+	return 1, nil
+}
+
 func UserSuitableForRestrictions(lenUsername, lenPassword, lenEmail int) bool {
 	if lenUsername > 32 || lenPassword > 128 || lenEmail > 64 {
 		return false

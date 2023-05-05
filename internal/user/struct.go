@@ -17,6 +17,7 @@ type LoginRequest struct {
 }
 
 type WishlistBook struct {
+	ID            string `json:"id"`
 	Title         string `json:"title"`
 	Author        string `json:"author"`
 	CoverImage    string `json:"cover_image"`
@@ -24,6 +25,7 @@ type WishlistBook struct {
 }
 
 type FinishedBook struct {
+	ID            string `json:"id"`
 	Title         string `json:"title"`
 	Author        string `json:"author"`
 	CoverImage    string `json:"cover_image"`
